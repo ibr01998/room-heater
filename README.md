@@ -23,7 +23,7 @@ So it's roughly **one old light bulb** of extra heat. In a small, closed room (a
 
 ## Requirements
 
-- A Mac running macOS. Apple Silicon is tested; Intel works CPU-only for now (see [Intel Macs](#intel-macs)).
+- A Mac running macOS. Apple Silicon and Intel MacBook Pros are tested (see [Intel Macs](#intel-macs)).
 - Apple's Command Line Tools for `clang`, `swiftc` and `python3`. Install them with `xcode-select --install`.
 - Plugged into the charger. The heater pauses itself on battery.
 
@@ -48,7 +48,7 @@ room-heater status           # is it running, and what are the guardrails doing
 room-heater stop
 ```
 
-The first start compiles two small helpers into `.build/`, which takes a few seconds. The log is written to `/tmp/room-heater.log`.
+The first start compiles two small helpers into `.build/`, which takes a few seconds. The log is written to `/tmp/room-heater.log`. While it runs, the heater keeps the Mac from going to sleep (the display still turns off as usual).
 
 ## Guardrails
 
@@ -57,8 +57,12 @@ Checked every 5 seconds. A paused part resumes by itself once things are back in
 | Condition | What pauses | Resumes when |
 |---|---|---|
 | Unplugged from the charger | everything | plugged back in |
-| Chip at 90 °C | GPU | chip below 80 °C |
-| Chip at 95 °C | everything | chip below 80 °C |
+| Chip at 90 °C (Apple Silicon) | GPU | chip below 80 °C |
+| Chip at 95 °C (Apple Silicon) | everything | chip below 80 °C |
+| CPU above 99 °C for 30 s (Intel) | one CPU core every 10 s | CPU below 97 °C, one core every 10 s |
+| CPU at 99.5 °C for 30 s (Intel) | GPU | CPU below 95 °C |
+| CPU at 99.5 °C for 2 min (Intel) | everything | CPU below 92 °C |
+| Discrete GPU at 95 °C (Intel) | GPU | GPU below 85 °C |
 | Battery at 38 °C | GPU | battery below 35 °C |
 | Battery at 42 °C | everything | battery below 35 °C |
 | Battery charge at 75% or less | GPU | back up to 79% |
@@ -70,7 +74,7 @@ Heat is what ages a battery fastest, which is why the battery limits are much lo
 
 ### Override for worn-out batteries
 
-If your battery is already worn out and you're replacing it anyway, you can turn off the battery-**charge** guardrails:
+If your battery is already worn out and you're replacing it anyway, you can lower the battery-**charge** guardrails to a floor that only keeps the Mac from running flat and shutting down (GPU pauses at 25%, everything at 10%, both resume at 35%). While the GPU is paused for charge, the heater burns only as many CPU cores as the charger can feed, steering by the battery current, so the battery holds steady around 20–25% and the heat keeps coming at whatever the charger supplies:
 
 ```bash
 room-heater start full 8 --allow-battery-drain
@@ -78,7 +82,7 @@ room-heater start full 8 --allow-battery-drain
 export ROOM_HEATER_ALLOW_BATTERY_DRAIN=1
 ```
 
-This lets the GPU run flat out and lets the battery drain while plugged in. **Don't use it on a battery you want to keep healthy.** The battery **temperature** limits stay on even with this override: a worn lithium battery that gets hot can swell, which is a safety problem, not just a lifespan one. Stop using the Mac if the battery looks swollen (the case bulges or the trackpad stops clicking).
+This lets the GPU run flat out and lets the battery drain while plugged in, which matters most on a small charger. **Don't use it on a battery you want to keep healthy.** The battery **temperature** limits stay on even with this override: a worn lithium battery that gets hot can swell, which is a safety problem, not just a lifespan one. Stop using the Mac if the battery looks swollen (the case bulges or the trackpad stops clicking).
 
 **Charger limit:** the GPU load is steady, never bursty, and adjusts to fit under what your charger can supply. It reads the charger's wattage and the Mac's power draw, and backs off as soon as the battery starts covering the difference. A bigger charger (for example a 140 W one) leaves more room for GPU heat.
 
@@ -96,7 +100,13 @@ Set `HEATER_DEBUG=1` before `room-heater start` to log every sensor reading and 
 
 ## Intel Macs
 
-Intel Macs don't expose the temperature sensors that `sensors.c` reads, so the GPU stays off and the heater runs CPU-only. macOS's own thermal protection still applies, as do the unplugged, battery charge and auto-off guardrails. Some Intel MacBook Pros (such as the 15" i9 models) drain the battery under full load even while charging; the battery-charge guardrails catch that.
+Intel Macs keep their temperature sensors in the SMC (System Management Controller) instead of the HID sensors Apple Silicon uses, so `sensors.c` reads the SMC there: the CPU package and hottest core, the discrete GPU die, the battery cells, and the whole system's power draw. No admin rights are needed. The GPU burner runs on the discrete GPU (for example a Radeon Pro 560X).
+
+Intel chips are rated to run at up to 100 °C. Under full load they turbo past what a laptop's cooling can carry, then hold themselves just under that limit, around 98 °C, by lowering their own clock speed. That is far smoother than anything the heater could do by pausing processes, so on Intel it leaves the CPU to the chip and acts only on averages, ignoring the turbo phase that holds 100 °C for up to a minute whenever load starts. It burns fewer cores only if the CPU averages above 99 °C over 30 seconds, pauses the GPU if that average reaches 99.5 °C, and pauses everything if the CPU averages 99.5 °C over 2 minutes. Expect the CPU to sit at 97–99 °C, and the fans to take a minute or two to ramp up.
+
+The heater logs a reading every minute (`room-heater status` shows the latest). On Intel it includes the system's power draw, which is also its heat output.
+
+Some Intel MacBook Pros (such as the 15" i9 models) draw more than the charger supplies under full load, so the battery drains even while plugged in. A 15" model needs a charger of 87 W or more **and a 5 A USB-C cable**: with an ordinary 3 A cable the Mac only gets 60 W. Check what it actually gets with `pmset -g ac`. The battery-charge guardrails catch the drain either way.
 
 ## License
 

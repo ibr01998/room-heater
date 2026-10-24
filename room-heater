@@ -12,7 +12,8 @@ case "$1" in
         if [ -f "$PIDFILE" ] && kill -0 "$(cat $PIDFILE)" 2>/dev/null; then
             echo "🌡️  Heater is running (PID $(cat $PIDFILE))"
             # Latest guardrail state from the log
-            grep -E 'started|paused|running' /tmp/room-heater.log 2>/dev/null | tail -3
+            grep -E 'started|paused|running|allowed' /tmp/room-heater.log 2>/dev/null | tail -3
+            grep '📊' /tmp/room-heater.log 2>/dev/null | tail -1
         else
             echo "❌ Heater is not running"
             rm -f "$PIDFILE"

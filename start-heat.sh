@@ -79,6 +79,8 @@ else
 fi
 HEAT_PID=$!
 echo "$HEAT_PID" > "$PIDFILE"
+# A heater is no use asleep: keep the Mac awake (the display can still sleep) while it runs
+caffeinate -i -w "$HEAT_PID" >/dev/null 2>&1 &
 sleep 1
 cat "$LOGFILE"
 echo "✅ Heater started (PID: $HEAT_PID)"
