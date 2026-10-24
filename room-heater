@@ -1,0 +1,24 @@
+#!/bin/bash
+HEATER_DIR="$(cd "$(dirname "$0")" && pwd)"
+case "$1" in
+    start)
+        exec "$HEATER_DIR/start-heat.sh" "${@:2}"
+        ;;
+    stop)
+        exec "$HEATER_DIR/stop-heat.sh"
+        ;;
+    status)
+        PIDFILE="/tmp/room-heater.pid"
+        if [ -f "$PIDFILE" ] && kill -0 "$(cat $PIDFILE)" 2>/dev/null; then
+            echo "🌡️  Heater is running (PID $(cat $PIDFILE))"
+            # Latest guardrail state from the log
+            grep -E 'started|paused|running' /tmp/room-heater.log 2>/dev/null | tail -3
+        else
+            echo "❌ Heater is not running"
+            rm -f "$PIDFILE"
+        fi
+        ;;
+    *)
+        echo "Usage: room-heater {start [full|gaming] [hours]|stop|status}"
+        ;;
+esac
