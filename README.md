@@ -30,7 +30,7 @@ So it's roughly **one old light bulb** of extra heat. In a small, closed room (a
 ## Install
 
 ```bash
-git clone https://github.com/<you>/room-heater.git
+git clone https://github.com/ibr01998/room-heater.git
 cd room-heater
 ./install.sh
 ```
